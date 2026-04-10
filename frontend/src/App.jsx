@@ -19,6 +19,7 @@ import {
   AlertCircle,
   BarChart2,
   MessageSquare,
+  LogOut,
 } from 'lucide-react';
 
 import UploadZone from './components/UploadZone.jsx';
@@ -27,6 +28,8 @@ import AnalysisPanel from './components/AnalysisPanel.jsx';
 import ChatPanel from './components/ChatPanel.jsx';
 
 import { uploadDocument, analyzeDocument } from './services/api.js';
+import { useAuth } from './auth/AuthContext.jsx';
+import { navigate } from './lib/router.js';
 
 // ── Tab definition ──────────────────────────────────────────────────────────
 
@@ -37,7 +40,7 @@ const TABS = [
 
 // ── Header ──────────────────────────────────────────────────────────────────
 
-function AppHeader({ docMeta, analysis, onReset }) {
+function AppHeader({ docMeta, analysis, onReset, onLogout }) {
   const LEVEL_DOT = {
     low:      'bg-risk-low',
     medium:   'bg-risk-medium',
@@ -85,6 +88,15 @@ function AppHeader({ docMeta, analysis, onReset }) {
           <RefreshCw size={13} />
           <span className="hidden sm:inline">New</span>
         </button>
+        <button
+          type="button"
+          onClick={onLogout}
+          className="btn-ghost flex items-center gap-1.5 shrink-0"
+          title="Sign out"
+        >
+          <LogOut size={13} />
+          <span className="hidden sm:inline">Logout</span>
+        </button>
       </div>
     </header>
   );
@@ -112,6 +124,13 @@ function ErrorBanner({ message, onDismiss }) {
 // ── Root component ────────────────────────────────────────────────────────────
 
 export default function App() {
+  const { signOut } = useAuth();
+
+  const handleLogout = async () => {
+    await signOut();
+    navigate('/login');
+  };
+
   // Phase machine
   const [phase, setPhase] = useState('idle'); // idle | uploading | analyzing | ready | error
 
@@ -181,7 +200,7 @@ export default function App() {
   if (phase === 'uploading' || phase === 'analyzing') {
     return (
       <div className="min-h-screen flex flex-col">
-        <AppHeader docMeta={docMeta} analysis={null} onReset={handleReset} />
+        <AppHeader docMeta={docMeta} analysis={null} onReset={handleReset} onLogout={handleLogout} />
         <main className="flex-1 max-w-5xl mx-auto w-full px-4 sm:px-6">
           <LoadingState phase={phase} />
         </main>
@@ -192,7 +211,7 @@ export default function App() {
   // Ready — full analysis + chat
   return (
     <div className="min-h-screen flex flex-col">
-      <AppHeader docMeta={docMeta} analysis={analysis} onReset={handleReset} />
+      <AppHeader docMeta={docMeta} analysis={analysis} onReset={handleReset} onLogout={handleLogout} />
 
       {errorMsg && (
         <ErrorBanner message={errorMsg} onDismiss={handleDismissError} />

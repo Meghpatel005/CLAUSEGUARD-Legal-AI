@@ -46,10 +46,17 @@ export default function LandingPage() {
           <div className="flex items-center gap-2 sm:gap-3">
             <button
               type="button"
-              onClick={() => navigate('/app')}
-              className="btn-ghost hidden text-sm sm:inline-flex"
+              onClick={() => navigate('/login')}
+              className="btn-ghost text-sm"
             >
-              Open analyzer
+              Sign in
+            </button>
+            <button
+              type="button"
+              onClick={() => navigate('/signup')}
+              className="btn-ghost text-sm"
+            >
+              Sign up
             </button>
             <button
               type="button"
