@@ -1,0 +1,162 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body {
+    @apply bg-surface-0 text-gray-100 font-sans;
+  }
+
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: #30363d #161b22;
+  }
+
+  *::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  *::-webkit-scrollbar-track {
+    @apply bg-surface-1;
+  }
+
+  *::-webkit-scrollbar-thumb {
+    @apply bg-surface-3 rounded-full;
+  }
+}
+
+@layer components {
+  .card {
+    @apply bg-surface-1 border border-surface-3 rounded-xl;
+  }
+
+  .btn-primary {
+    @apply bg-brand hover:bg-brand-light text-white font-medium px-4 py-2 rounded-lg
+           transition-all duration-150 disabled:opacity-40 disabled:cursor-not-allowed
+           focus:outline-none focus:ring-2 focus:ring-brand focus:ring-offset-2 focus:ring-offset-surface-0;
+  }
+
+  .btn-ghost {
+    @apply text-gray-400 hover:text-gray-100 hover:bg-surface-2 px-3 py-1.5 rounded-lg
+           transition-all duration-150 text-sm font-medium;
+  }
+
+  .risk-badge {
+    @apply inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold uppercase tracking-wide;
+  }
+}
+
+@layer utilities {
+  .animate-pulse-slow {
+    animation: pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+}
+
+/* Upload zone drag-active state */
+.upload-active {
+  @apply border-brand bg-brand/5;
+}
+
+/* Prose styling for AI chat responses */
+.prose-chat p { @apply mb-3 last:mb-0 leading-relaxed; }
+.prose-chat ul { @apply list-disc pl-5 mb-3 space-y-1; }
+.prose-chat ol { @apply list-decimal pl-5 mb-3 space-y-1; }
+.prose-chat strong { @apply font-semibold text-gray-100; }
+.prose-chat code { @apply font-mono text-sm bg-surface-2 px-1 py-0.5 rounded text-brand-light; }
+
+/* Risk score ring animation */
+@keyframes score-ring {
+  from { stroke-dashoffset: 251; }
+  to   { stroke-dashoffset: var(--target-offset); }
+}
+
+.score-ring-animate {
+  animation: score-ring 1.2s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+}
+
+/* Landing page effects */
+@keyframes landing-float {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-16px);
+  }
+}
+
+.landing-float {
+  animation: landing-float 7s ease-in-out infinite;
+}
+
+.landing-float-delayed {
+  animation: landing-float 9s ease-in-out infinite reverse;
+}
+
+.landing-grid {
+  background-image:
+    radial-gradient(circle at 20% 20%, rgba(124, 58, 237, 0.12), transparent 35%),
+    radial-gradient(circle at 80% 0%, rgba(76, 29, 149, 0.25), transparent 40%),
+    linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+  background-size: auto, auto, 36px 36px, 36px 36px;
+  background-position: center;
+}
+
+.landing-card {
+  transition: transform 180ms ease, box-shadow 220ms ease, border-color 220ms ease;
+}
+
+.landing-card:hover {
+  transform: translateY(-3px);
+  border-color: rgba(124, 58, 237, 0.5);
+  box-shadow: 0 20px 60px -30px rgba(124, 58, 237, 0.85);
+}
+
+@keyframes landing-shimmer {
+  0%, 100% {
+    opacity: 0.35;
+    transform: translate(0, 0) scale(1);
+  }
+  50% {
+    opacity: 0.55;
+    transform: translate(8%, -4%) scale(1.05);
+  }
+}
+
+.landing-shimmer {
+  animation: landing-shimmer 12s ease-in-out infinite;
+}
+
+@keyframes landing-spin-slow {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.landing-icon-spin {
+  animation: landing-spin-slow 14s linear infinite;
+}
+
+.landing-gradient-text {
+  background: linear-gradient(120deg, #c4b5fd 0%, #7c3aed 45%, #a78bfa 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.landing-title {
+  text-shadow: 0 0 80px rgba(124, 58, 237, 0.15);
+}
+
+.landing-badge {
+  box-shadow: 0 0 0 1px rgba(124, 58, 237, 0.2), 0 8px 32px -12px rgba(124, 58, 237, 0.35);
+}
