@@ -43,7 +43,7 @@ export default function SignUpPage() {
   return (
     <AuthLayout
       title="Sign up"
-      subtitle="Create an account to use ClauseGuard AI. You will sign in on the next step."
+      subtitle="Create an account to use ClauseVerifyer AI. You will sign in on the next step."
       footer={
         <span className="text-gray-400">
           Already have an account?{' '}

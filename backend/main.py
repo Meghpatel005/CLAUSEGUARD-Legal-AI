@@ -9,7 +9,7 @@ import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from routers import chat, documents
+from routers import admin, chat, documents
 
 logging.basicConfig(
     level=logging.INFO,
@@ -40,6 +40,7 @@ app.add_middleware(
 # ── Routers ────────────────────────────────────────────────────────────────
 app.include_router(documents.router)
 app.include_router(chat.router)
+app.include_router(admin.router)
 
 
 # ── Health check ───────────────────────────────────────────────────────────

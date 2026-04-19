@@ -55,6 +55,17 @@ class DocumentStore:
     def exists(self, doc_id: str) -> bool:
         return doc_id in self._documents
 
+    def list_all(self) -> List[dict]:
+        """Return all stored documents as a list."""
+        return list(self._documents.values())
+
+    def delete(self, doc_id: str) -> bool:
+        """Delete a document by ID and return True when deleted."""
+        if doc_id not in self._documents:
+            return False
+        del self._documents[doc_id]
+        return True
+
 
 # Singleton — imported by all routers and services
 document_store = DocumentStore()

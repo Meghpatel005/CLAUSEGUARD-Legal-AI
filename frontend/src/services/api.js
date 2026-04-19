@@ -1,5 +1,5 @@
 /**
- * api.js — ClauseGuard AI HTTP client
+ * api.js — ClauseVerifyer AI HTTP client
  *
  * All field names mirror the FastAPI response shapes exactly.
  * The Vite proxy forwards /api/* → http://localhost:8000, so no
@@ -75,5 +75,34 @@ export async function sendChatMessage(documentId, message, history) {
     message,
     history,
   });
+  return data;
+}
+
+// ── Admin endpoints ─────────────────────────────────────────────────────────
+
+/**
+ * Fetch mock users for admin dashboard.
+ * @returns {{ id: string, name: string, email: string, role: string }[]}
+ */
+export async function getAdminUsers() {
+  const { data } = await http.get('/api/admin/users');
+  return data;
+}
+
+/**
+ * Fetch all stored document metadata for admin dashboard.
+ * @returns {{ total: number, documents: object[] }}
+ */
+export async function getAdminDocuments() {
+  const { data } = await http.get('/api/admin/documents');
+  return data;
+}
+
+/**
+ * Delete a document from the in-memory document store.
+ * @param {string} documentId
+ */
+export async function deleteAdminDocument(documentId) {
+  const { data } = await http.delete(`/api/admin/document/${documentId}`);
   return data;
 }

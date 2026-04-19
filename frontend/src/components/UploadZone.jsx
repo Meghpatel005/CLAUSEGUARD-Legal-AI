@@ -47,7 +47,7 @@ export default function UploadZone({ onUpload, disabled }) {
         </div>
         <div className="text-center">
           <h1 className="text-3xl font-bold text-gray-100 tracking-tight">
-            ClauseGuard <span className="text-brand">AI</span>
+            ClauseVerifyer <span className="text-brand">AI</span>
           </h1>
           <p className="text-gray-400 mt-2 text-base max-w-md">
             Upload a legal document for instant clause analysis, risk assessment,

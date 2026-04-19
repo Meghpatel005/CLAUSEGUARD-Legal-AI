@@ -18,7 +18,7 @@ export default function AuthLayout({ title, subtitle, children, footer }) {
           >
             <ShieldCheck size={22} className="text-brand" strokeWidth={1.8} />
             <span className="text-sm font-semibold tracking-tight">
-              Clause<span className="text-brand">Guard</span> AI
+              ClauseVerifyer AI
             </span>
           </button>
         </div>

@@ -1,5 +1,5 @@
 /**
- * App.jsx — ClauseGuard AI root component.
+ * App.jsx — ClauseVerifyer AI root component.
  *
  * Implements a phase-based state machine:
  *
@@ -55,7 +55,7 @@ function AppHeader({ docMeta, analysis, onReset, onLogout }) {
         <div className="flex items-center gap-2 shrink-0">
           <Shield size={20} className="text-brand" strokeWidth={1.5} />
           <span className="font-semibold text-gray-100 text-sm">
-            Clause<span className="text-brand">Guard</span> AI
+            ClauseVerifyer AI
           </span>
         </div>
 
@@ -87,6 +87,15 @@ function AppHeader({ docMeta, analysis, onReset, onLogout }) {
         <button onClick={onReset} className="btn-ghost flex items-center gap-1.5 ml-2 shrink-0">
           <RefreshCw size={13} />
           <span className="hidden sm:inline">New</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => navigate('/admin')}
+          className="btn-ghost flex items-center gap-1.5 shrink-0"
+          title="Open admin dashboard"
+        >
+          <span className="hidden sm:inline">Admin</span>
+          <span className="sm:hidden">AD</span>
         </button>
         <button
           type="button"
@@ -256,7 +265,7 @@ export default function App() {
       {/* Footer */}
       <footer className="border-t border-surface-3 py-4 text-center">
         <p className="text-xs text-gray-600">
-          ClauseGuard AI · For academic review only · Not a substitute for qualified legal advice
+          ClauseVerifyer AI · For academic review only · Not a substitute for qualified legal advice
         </p>
       </footer>
     </div>

@@ -41,7 +41,7 @@ export default function LandingPage() {
           <a href="/" className="flex items-center gap-2">
             <ShieldCheck size={22} className="text-brand" strokeWidth={1.8} />
             <span className="text-sm font-semibold tracking-tight">
-              Clause<span className="text-brand">Guard</span> AI
+              ClauseVerifyer AI
             </span>
           </a>
           <div className="flex items-center gap-2 sm:gap-3">
@@ -77,7 +77,7 @@ export default function LandingPage() {
           </h1>
 
           <p className="mx-auto mt-6 max-w-2xl text-pretty text-base leading-relaxed text-gray-400 sm:text-lg">
-            ClauseGuard AI combines upload, structured analysis, and grounded chat — same dark theme
+            ClauseVerifyer AI combines upload, structured analysis, and grounded chat — same dark theme
             and purple accent you use in the app, with a focused workflow for academic review.
           </p>
 
@@ -127,7 +127,7 @@ export default function LandingPage() {
             onClick={() => navigate('/app')}
             className="btn-primary mt-5 inline-flex items-center gap-2 px-6"
           >
-            Launch ClauseGuard
+            Launch ClauseVerifyer AI
             <ArrowRight size={15} />
           </button>
         </section>
@@ -135,7 +135,7 @@ export default function LandingPage() {
 
       <footer className="relative z-10 border-t border-surface-3/70 py-6 text-center">
         <p className="text-xs text-gray-600">
-          ClauseGuard AI · For academic review only · Not a substitute for qualified legal advice
+          ClauseVerifyer AI · For academic review only · Not a substitute for qualified legal advice
         </p>
       </footer>
     </div>
