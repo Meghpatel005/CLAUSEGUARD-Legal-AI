@@ -3,10 +3,11 @@
  *   overview cards → risk meter → summary → clause list
  */
 
-import { useEffect, useRef } from 'react';
-import { FileText, Users, Calendar, ShieldAlert, BookOpen } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { FileText, Users, Calendar, ShieldAlert, BookOpen, Download, Scale, AlertTriangle, CheckCircle, HelpCircle } from 'lucide-react';
 import RiskBadge from './RiskBadge.jsx';
 import ClauseCard from './ClauseCard.jsx';
+import { downloadAnnotatedPDF } from '../services/api.js';
 
 // ── Risk score SVG ring ────────────────────────────────────────────────────
 
@@ -85,7 +86,22 @@ export default function AnalysisPanel({ analysis, docMeta }) {
     clauses = [],
     overall_risk_score,
     overall_risk_level,
+    lawyer_summary = {},
   } = analysis;
+
+  const [isDownloading, setIsDownloading] = useState(false);
+
+  const handleDownloadPDF = async () => {
+    try {
+      setIsDownloading(true);
+      await downloadAnnotatedPDF(docMeta.document_id);
+    } catch (e) {
+      alert("Failed to download PDF. See console for details.");
+      console.error(e);
+    } finally {
+      setIsDownloading(false);
+    }
+  };
 
   // Group clauses by risk level for the breakdown display
   const riskCounts = clauses.reduce((acc, c) => {
@@ -160,13 +176,87 @@ export default function AnalysisPanel({ analysis, docMeta }) {
 
       {/* ── Document summary ──────────────────────────────────────────── */}
       <div className="card p-6">
-        <div className="flex items-center gap-2 mb-3">
-          <FileText size={16} className="text-brand" />
-          <h2 className="text-sm font-semibold text-gray-200 uppercase tracking-wider">
-            Plain-Language Summary
-          </h2>
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <FileText size={16} className="text-brand" />
+            <h2 className="text-sm font-semibold text-gray-200 uppercase tracking-wider">
+              Plain-Language Summary
+            </h2>
+          </div>
+          <button
+            onClick={handleDownloadPDF}
+            disabled={isDownloading}
+            className="flex items-center gap-1.5 text-xs font-medium bg-brand/10 hover:bg-brand/20 text-brand px-3 py-1.5 rounded transition-colors disabled:opacity-50"
+          >
+            <Download size={14} />
+            {isDownloading ? 'Downloading...' : 'Annotated PDF'}
+          </button>
         </div>
-        <p className="text-gray-300 leading-relaxed text-sm">{summary}</p>
+        <p className="text-gray-300 leading-relaxed text-sm mb-6">{summary}</p>
+
+        {/* Lawyer-Style Review block */}
+        <div className="bg-surface-2 rounded-lg p-5 border border-surface-3">
+          <div className="flex items-center gap-2 mb-4 border-b border-surface-3 pb-3">
+            <Scale size={18} className="text-gray-400" />
+            <h3 className="text-sm font-bold text-gray-200">Lawyer-Style Review</h3>
+          </div>
+          
+          <div className="space-y-4">
+            <div>
+              <h4 className="text-xs uppercase tracking-wider text-gray-500 font-semibold mb-1">Quick Summary</h4>
+              <p className="text-sm text-gray-300">{lawyer_summary.quick_summary || 'N/A'}</p>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="bg-red-500/5 rounded p-3 border border-red-500/10">
+                <div className="flex items-center gap-1.5 mb-1 text-red-400">
+                  <AlertTriangle size={14} />
+                  <h4 className="text-xs font-semibold uppercase tracking-wider">Why This May Be Risky</h4>
+                </div>
+                <p className="text-sm text-gray-300">{lawyer_summary.why_risky || 'N/A'}</p>
+              </div>
+
+              <div className="bg-orange-500/5 rounded p-3 border border-orange-500/10">
+                <div className="flex items-center gap-1.5 mb-1 text-orange-400">
+                  <HelpCircle size={14} />
+                  <h4 className="text-xs font-semibold uppercase tracking-wider">What to Watch Out For</h4>
+                </div>
+                <p className="text-sm text-gray-300">{lawyer_summary.watch_out || 'N/A'}</p>
+              </div>
+            </div>
+
+            {lawyer_summary.questions_to_ask && lawyer_summary.questions_to_ask.length > 0 && (
+              <div className="bg-blue-500/5 rounded p-3 border border-blue-500/10">
+                <h4 className="text-xs font-semibold uppercase tracking-wider text-blue-400 mb-2">Questions to Ask</h4>
+                <ul className="list-disc list-inside text-sm text-gray-300 space-y-1">
+                  {lawyer_summary.questions_to_ask.map((q, idx) => (
+                    <li key={idx}>{q}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            <div>
+              <h4 className="text-xs uppercase tracking-wider text-gray-500 font-semibold mb-1">Lawyer Explanation</h4>
+              <p className="text-sm text-gray-300">{lawyer_summary.lawyer_explanation || 'N/A'}</p>
+            </div>
+
+            {lawyer_summary.suggested_rewrite && lawyer_summary.suggested_rewrite !== 'N/A' && (
+              <div className="bg-green-500/5 rounded p-3 border border-green-500/10">
+                <h4 className="text-xs font-semibold uppercase tracking-wider text-green-400 mb-1">Suggested Safer Rewrite</h4>
+                <p className="text-sm text-gray-300">{lawyer_summary.suggested_rewrite}</p>
+              </div>
+            )}
+
+            <div className="pt-2 border-t border-surface-3">
+              <div className="flex items-center gap-1.5 mb-1 text-gray-100">
+                <CheckCircle size={14} className="text-brand" />
+                <h4 className="text-sm font-semibold">Final Recommendation</h4>
+              </div>
+              <p className="text-sm text-gray-300 font-medium">{lawyer_summary.final_recommendation || 'N/A'}</p>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* ── Clause list ───────────────────────────────────────────────── */}

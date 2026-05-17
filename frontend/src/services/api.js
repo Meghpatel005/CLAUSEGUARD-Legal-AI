@@ -113,6 +113,30 @@ export async function deleteDocument(documentId) {
   return data;
 }
 
+export async function downloadAnnotatedPDF(documentId) {
+  const { data, headers } = await http.get(`/api/documents/${documentId}/annotated`, {
+    responseType: 'blob',
+  });
+  
+  let filename = `annotated_document_${documentId}.pdf`;
+  const disposition = headers['content-disposition'];
+  if (disposition && disposition.indexOf('filename=') !== -1) {
+    const filenameRegex = /filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/;
+    const matches = filenameRegex.exec(disposition);
+    if (matches != null && matches[1]) { 
+      filename = matches[1].replace(/['"]/g, '');
+    }
+  }
+
+  const url = window.URL.createObjectURL(new Blob([data]));
+  const link = document.createElement('a');
+  link.href = url;
+  link.setAttribute('download', filename);
+  document.body.appendChild(link);
+  link.click();
+  link.parentNode.removeChild(link);
+}
+
 // ── Chat ───────────────────────────────────────────────────────────────────
 
 export async function sendChatMessage(documentId, message, history = []) {

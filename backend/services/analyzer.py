@@ -33,6 +33,15 @@ Return exactly this structure:
   "effective_date": "<ISO date string or null>",
   "overall_risk_score": <integer 0-100>,
   "overall_risk_level": "<low|medium|high|critical>",
+  "lawyer_summary": {
+    "quick_summary": "<A 1-2 sentence extremely simple summary for non-lawyers>",
+    "why_risky": "<Explanation of main risks overall>",
+    "watch_out": "<Specific gotchas to watch out for>",
+    "questions_to_ask": ["<Question 1 to ask the other party>", "<Question 2>"],
+    "lawyer_explanation": "<A professional, practical explanation of the contract's implications>",
+    "suggested_rewrite": "<Optional suggestion on how a risky part could be renegotiated>",
+    "final_recommendation": "<A clear final recommendation on whether to sign or negotiate>"
+  },
   "clauses": [
     {
       "id": "clause_1",
@@ -40,7 +49,9 @@ Return exactly this structure:
       "text": "<verbatim excerpt from the document, max 200 words>",
       "risk_level": "<low|medium|high|critical>",
       "risk_reason": "<one or two sentences explaining the risk or why this clause is notable>",
-      "category": "<Termination | Liability | Confidentiality | Payment | IP | Indemnification | Governing Law | Non-Compete | Warranty | other>"
+      "category": "<Termination | Liability | Confidentiality | Payment | IP | Indemnification | Governing Law | Non-Compete | Warranty | other>",
+      "risk_type": "<liability risk | payment risk | privacy risk | termination risk | ambiguity risk | general risk>",
+      "confidence_score": <integer 0-100>
     }
   ]
 }
@@ -49,6 +60,7 @@ Guidelines:
 - Identify between 5 and 10 of the most legally significant clauses.
 - Risk scale: low = standard/acceptable industry norm; medium = worth reviewing; high = significant concern for the signing party; critical = major legal risk or unusually one-sided.
 - The summary must be understandable to a non-lawyer.
+- The lawyer_summary should feel like a real lawyer explaining the risk in plain English.
 - overall_risk_score should be consistent with overall_risk_level:
     low 0-25 | medium 26-50 | high 51-75 | critical 76-100
 """
@@ -83,6 +95,15 @@ def _normalise_analysis(data: Dict[str, Any], document_id: str) -> Dict[str, Any
     data.setdefault("effective_date", None)
     data.setdefault("overall_risk_score", 0)
     data.setdefault("overall_risk_level", "low")
+    data.setdefault("lawyer_summary", {
+        "quick_summary": "Summary not provided.",
+        "why_risky": "N/A",
+        "watch_out": "N/A",
+        "questions_to_ask": [],
+        "lawyer_explanation": "N/A",
+        "suggested_rewrite": "N/A",
+        "final_recommendation": "N/A"
+    })
     data.setdefault("clauses", [])
 
     if data["overall_risk_level"] not in valid_risk:
@@ -95,6 +116,8 @@ def _normalise_analysis(data: Dict[str, Any], document_id: str) -> Dict[str, Any
         clause.setdefault("risk_level", "low")
         clause.setdefault("risk_reason", "")
         clause.setdefault("category", "General")
+        clause.setdefault("risk_type", "general risk")
+        clause.setdefault("confidence_score", 80)
         if clause["risk_level"] not in valid_risk:
             clause["risk_level"] = "medium"
 

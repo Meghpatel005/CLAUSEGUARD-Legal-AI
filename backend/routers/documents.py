@@ -109,6 +109,33 @@ async def get_document(document_id: str, current_user: CurrentUser):
     }
 
 
+@router.get("/{document_id}/annotated")
+async def get_annotated_document(document_id: str, current_user: CurrentUser):
+    from fastapi.responses import Response
+    from services.pdf_annotator import annotate_pdf_with_analysis
+    from storage.file_storage import pdf_path
+
+    doc = await document_repository.get_for_user(document_id, current_user)
+    if not doc:
+        raise HTTPException(status_code=404, detail="Document not found.")
+
+    if not doc.get("is_analyzed") or not doc.get("analysis"):
+        raise HTTPException(status_code=400, detail="Document has not been analyzed yet.")
+
+    path = pdf_path(doc["stored_filename"])
+    if not path.is_file():
+        raise HTTPException(status_code=404, detail="PDF file not found on disk.")
+        
+    original_pdf_bytes = path.read_bytes()
+    annotated_pdf_bytes = annotate_pdf_with_analysis(original_pdf_bytes, doc["analysis"])
+    
+    return Response(
+        content=annotated_pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="annotated_{doc["filename"]}"'}
+    )
+
+
 @router.delete("/{document_id}")
 async def delete_document(document_id: str, current_user: CurrentUser):
     doc = await document_repository.get_for_user(document_id, current_user)

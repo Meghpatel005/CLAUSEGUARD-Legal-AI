@@ -69,6 +69,16 @@ export default function ClauseCard({ clause, index }) {
             <span className={`text-[10px] font-medium px-2 py-0.5 rounded border ${categoryClass}`}>
               {clause.category}
             </span>
+            {clause.risk_type && (
+              <span className="text-[10px] font-medium px-2 py-0.5 rounded border bg-gray-800 text-gray-400 border-gray-700 capitalize">
+                {clause.risk_type}
+              </span>
+            )}
+            {clause.confidence_score && (
+              <span className="text-[10px] font-medium px-2 py-0.5 rounded border bg-brand/10 text-brand border-brand/20">
+                {clause.confidence_score}% Confident
+              </span>
+            )}
           </div>
         </div>
 
