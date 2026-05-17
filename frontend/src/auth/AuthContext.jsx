@@ -6,72 +6,72 @@ import {
   useMemo,
   useState,
 } from 'react';
-import {
-  onAuthStateChanged,
-  signInWithEmailAndPassword,
-  createUserWithEmailAndPassword,
-  signOut as firebaseSignOut,
-} from 'firebase/auth';
-import { auth, isFirebaseConfigured } from '../lib/firebase';
+import { getMe, getStoredToken, login as apiLogin, logout as apiLogout, signup as apiSignup } from '../services/api.js';
 
 const AuthContext = createContext(null);
 
-function mapFirebaseError(err) {
-  if (!err?.code) return err?.message ?? 'Something went wrong.';
-  const map = {
-    'auth/email-already-in-use': 'This email is already registered.',
-    'auth/invalid-email': 'Enter a valid email address.',
-    'auth/weak-password': 'Password should be at least 6 characters.',
-    'auth/invalid-credential':
-      'Invalid email or password.',
-    'auth/user-not-found': 'Invalid email or password.',
-    'auth/wrong-password': 'Invalid email or password.',
-    'auth/too-many-requests': 'Too many attempts. Try again later.',
-    'auth/network-request-failed': 'Network error. Check your connection.',
-  };
-  return map[err.code] ?? err.message ?? 'Authentication failed.';
+function mapAuthError(message) {
+  const lower = (message ?? '').toLowerCase();
+  if (lower.includes('already registered')) return 'This email is already registered.';
+  if (lower.includes('invalid email or password')) return 'Invalid email or password.';
+  if (lower.includes('not authenticated')) return 'Please sign in again.';
+  if (lower.includes('invalid or expired token')) {
+    return 'Your session expired. Please sign in again.';
+  }
+  return message ?? 'Authentication failed.';
 }
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    if (!auth) {
+  const refreshUser = useCallback(async () => {
+    const token = getStoredToken();
+    if (!token) {
       setUser(null);
-      setLoading(false);
-      return;
+      return null;
     }
-
-    const unsub = onAuthStateChanged(auth, (u) => {
-      setUser(u);
-      setLoading(false);
-    });
-
-    return () => unsub();
+    try {
+      const me = await getMe();
+      setUser(me);
+      return me;
+    } catch {
+      apiLogout();
+      setUser(null);
+      return null;
+    }
   }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      await refreshUser();
+      if (!cancelled) setLoading(false);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [refreshUser]);
 
   const signIn = useCallback(async (email, password) => {
-    if (!auth) throw new Error('Firebase is not configured.');
     try {
-      await signInWithEmailAndPassword(auth, email, password);
+      const data = await apiLogin(email, password);
+      setUser(data.user);
     } catch (e) {
-      throw new Error(mapFirebaseError(e));
+      throw new Error(mapAuthError(e.message));
     }
   }, []);
 
-  const signUp = useCallback(async (email, password) => {
-    if (!auth) throw new Error('Firebase is not configured.');
+  const signUp = useCallback(async (name, email, password) => {
     try {
-      await createUserWithEmailAndPassword(auth, email, password);
+      await apiSignup(name, email, password);
     } catch (e) {
-      throw new Error(mapFirebaseError(e));
+      throw new Error(mapAuthError(e.message));
     }
   }, []);
 
   const signOut = useCallback(async () => {
-    if (!auth) return;
-    await firebaseSignOut(auth);
+    apiLogout();
     setUser(null);
   }, []);
 
@@ -82,9 +82,10 @@ export function AuthProvider({ children }) {
       signIn,
       signUp,
       signOut,
-      configured: isFirebaseConfigured,
+      configured: true,
+      refreshUser,
     }),
-    [user, loading, signIn, signUp, signOut]
+    [user, loading, signIn, signUp, signOut, refreshUser]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

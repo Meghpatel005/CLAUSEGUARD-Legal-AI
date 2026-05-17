@@ -62,12 +62,26 @@ class AIClient:
                     messages, json_mode, temperature, max_tokens
                 )
             except Exception as exc:
-                logger.warning("Groq request failed (%s). Falling back to OpenRouter.", exc)
+                err_text = str(exc).lower()
+                if "invalid_api_key" in err_text or "invalid api key" in err_text:
+                    logger.warning("Groq API key rejected. Falling back to OpenRouter.")
+                else:
+                    logger.warning("Groq request failed (%s). Falling back to OpenRouter.", exc)
 
         if settings.openrouter_api_key:
-            return await self._openrouter_complete(
-                messages, json_mode, temperature, max_tokens
-            )
+            try:
+                return await self._openrouter_complete(
+                    messages, json_mode, temperature, max_tokens
+                )
+            except httpx.HTTPStatusError as exc:
+                if exc.response.status_code == 401:
+                    raise RuntimeError(
+                        "OpenRouter rejected the API key (401). "
+                        "Check OPENROUTER_API_KEY in backend/.env — it should start with sk-or-v1-."
+                    ) from exc
+                raise RuntimeError(
+                    f"OpenRouter request failed ({exc.response.status_code})."
+                ) from exc
 
         raise RuntimeError(
             "No AI provider is configured. "

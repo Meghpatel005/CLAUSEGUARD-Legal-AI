@@ -1,10 +1,5 @@
 """
-Chat router.
-
-Implements RAG-lite: the top-k most relevant document chunks are injected
-into the system prompt on every turn.  This keeps the implementation
-stateless on the server side (no retrieval index to maintain) while
-grounding the model firmly in the uploaded document.
+Chat router — RAG-grounded Q&A with persistent MongoDB history.
 """
 
 from __future__ import annotations
@@ -13,11 +8,13 @@ import logging
 
 from fastapi import APIRouter, HTTPException
 
+from auth.dependencies import CurrentUser
 from config import settings
-from models.schemas import ChatRequest, ChatResponse
+from models.schemas import ChatHistoryResponse, ChatMessage, ChatRequest, ChatResponse
 from services.ai_client import ai_client
 from services.retriever import retrieve_relevant_chunks
-from storage.document_store import document_store
+from storage.chat_repository import chat_repository
+from storage.document_repository import document_repository
 
 logger = logging.getLogger(__name__)
 
@@ -47,15 +44,26 @@ Instructions:
 """
 
 
-@router.post("", response_model=ChatResponse)
-async def chat(request: ChatRequest) -> ChatResponse:
-    """
-    Respond to a user question grounded in the uploaded document.
+@router.get("")
+async def list_chat_threads(current_user: CurrentUser):
+    """List document chat threads for the current user."""
+    return await chat_repository.list_threads_for_user(current_user.id)
 
-    Retrieves the most relevant chunks via TF-IDF, builds a context-rich
-    system prompt, and delegates generation to the AI client.
-    """
-    doc = document_store.get(request.document_id)
+
+@router.get("/{document_id}", response_model=ChatHistoryResponse)
+async def get_chat_history(document_id: str, current_user: CurrentUser):
+    doc = await document_repository.get_for_user(document_id, current_user)
+    if not doc:
+        raise HTTPException(status_code=404, detail="Document not found.")
+
+    stored = await chat_repository.get_messages(current_user.id, document_id)
+    messages = [ChatMessage(role=m["role"], content=m["content"]) for m in stored]
+    return ChatHistoryResponse(document_id=document_id, messages=messages)
+
+
+@router.post("", response_model=ChatResponse)
+async def chat(request: ChatRequest, current_user: CurrentUser) -> ChatResponse:
+    doc = await document_repository.get_for_user(request.document_id, current_user)
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found.")
 
@@ -65,7 +73,6 @@ async def chat(request: ChatRequest) -> ChatResponse:
             detail="Document must be analysed before starting a chat session.",
         )
 
-    # Retrieve top-k relevant chunks for this question
     relevant_chunks = retrieve_relevant_chunks(
         request.message,
         doc["chunks"],
@@ -73,17 +80,23 @@ async def chat(request: ChatRequest) -> ChatResponse:
     )
     context = "\n\n---\n\n".join(relevant_chunks) if relevant_chunks else "(No relevant excerpts found.)"
 
-    analysis = doc["analysis"]
+    analysis = doc["analysis"] or {}
     system_prompt = _SYSTEM_TEMPLATE.format(
         document_type=analysis.get("document_type", "Legal Document"),
         summary=analysis.get("summary", ""),
         context=context,
     )
 
-    # Build message list: system + last 8 history turns + current message
+    # Prefer persisted history; fall back to client-sent history for compatibility
+    persisted = await chat_repository.get_messages(current_user.id, request.document_id)
+    if persisted:
+        history = persisted
+    else:
+        history = [{"role": m.role, "content": m.content} for m in request.history]
+
     messages = [{"role": "system", "content": system_prompt}]
-    for msg in request.history[-8:]:
-        messages.append({"role": msg.role, "content": msg.content})
+    for msg in history[-8:]:
+        messages.append({"role": msg["role"], "content": msg["content"]})
     messages.append({"role": "user", "content": request.message})
 
     try:
@@ -95,8 +108,21 @@ async def chat(request: ChatRequest) -> ChatResponse:
         )
     except RuntimeError as exc:
         raise HTTPException(status_code=503, detail=str(exc))
-    except Exception as exc:
+    except Exception:
         logger.exception("Chat completion failed.")
-        raise HTTPException(status_code=500, detail=f"Chat failed: {exc}")
+        raise HTTPException(status_code=500, detail="Chat failed.")
+
+    await chat_repository.append_messages(
+        current_user.id,
+        request.document_id,
+        [
+            {"role": "user", "content": request.message},
+            {
+                "role": "assistant",
+                "content": response_text,
+                "sources_used": len(relevant_chunks),
+            },
+        ],
+    )
 
     return ChatResponse(response=response_text, sources_used=len(relevant_chunks))

@@ -6,42 +6,30 @@ A full-stack legal document analysis system. Upload a PDF contract or agreement 
 - **Risk assessment** — per-clause and overall risk scoring (low / medium / high / critical)
 - **Plain-language summary** — non-lawyer-friendly explanation of what the document does
 - **Document-grounded chat** — ask questions, get answers cited from the document text
+- **Multi-user accounts** — JWT auth, per-user documents, persistent chat history (MongoDB)
 
 ---
 
 ## Architecture
 
 ```
-clauseguard/
+final_submission_proejct-main/
 ├── backend/               FastAPI (Python 3.11+)
-│   ├── main.py            App entry, CORS, router wiring
-│   ├── config.py          Pydantic-settings (reads .env)
-│   ├── models/schemas.py  All Pydantic request/response types
-│   ├── storage/           In-memory document store (dict-based)
-│   ├── services/
-│   │   ├── ai_client.py   Groq primary → OpenRouter fallback
-│   │   ├── pdf_extractor  pdfplumber text extraction
-│   │   ├── text_chunker   Overlapping word-count chunker
-│   │   ├── analyzer       LLM structured JSON analysis
-│   │   └── retriever      TF-IDF chunk retrieval (no vector DB)
-│   └── routers/           /api/documents  +  /api/chat
+│   ├── main.py            App entry, lifespan, CORS
+│   ├── config.py          Pydantic-settings (.env)
+│   ├── db/                Motor MongoDB connection + indexes
+│   ├── auth/              JWT, bcrypt, FastAPI dependencies
+│   ├── models/            Pydantic API + user models
+│   ├── storage/           Repositories + disk PDF storage (uploads/)
+│   ├── services/          AI, PDF, chunking, analyzer, retriever
+│   ├── routers/           auth, documents, chat, admin
+│   └── middleware/        Safe error responses
 └── frontend/              Vite + React 18 + Tailwind CSS
     └── src/
-        ├── App.jsx         Phase state machine (idle→upload→analyze→ready)
-        ├── services/api.js Axios client, exact backend contract
-        └── components/     UploadZone, AnalysisPanel, ClauseCard,
-                            RiskBadge, ChatPanel, LoadingState
+        ├── auth/          JWT session (localStorage)
+        ├── services/api.js
+        └── components/
 ```
-
-### Key design decisions
-
-| Decision | Rationale |
-|---|---|
-| In-memory document store | Removes DB operational overhead; valid for single-user/session use. Swap for SQLite/Postgres without touching other layers. |
-| TF-IDF retrieval | Lightweight, reproducible, no external index service. Sufficient for single-document RAG. |
-| Groq → OpenRouter fallback | Keeps the app operational during Groq rate-limit windows. |
-| Word-count chunking with overlap | Clause boundaries don't align with character counts; overlap prevents silent mid-clause splits. |
-| JSON-mode LLM analysis | Structured output eliminates parsing fragility; `_extract_json` handles fence leakage from non-compliant model variants. |
 
 ---
 
@@ -51,83 +39,113 @@ clauseguard/
 
 - Python 3.11+
 - Node 18+
-- A [Groq API key](https://console.groq.com/) and/or an [OpenRouter API key](https://openrouter.ai/)
+- **MongoDB** running locally or Atlas URI
+- A [Groq API key](https://console.groq.com/) and/or [OpenRouter API key](https://openrouter.ai/)
 
 ---
 
-### Backend
+### 1. MongoDB
+
+```bash
+# macOS (Homebrew)
+brew services start mongodb-community
+
+# Or Docker
+docker run -d -p 27017:27017 --name clauseguard-mongo mongo:7
+```
+
+---
+
+### 2. Backend
 
 ```bash
 cd backend
 
-# 1. Create a virtual environment
 python -m venv .venv
-source .venv/bin/activate      # Windows: .venv\Scripts\activate
+source .venv/bin/activate
 
-# 2. Install dependencies
 pip install -r requirements.txt
 
-# 3. Configure environment
 cp .env.example .env
-# Edit .env and set GROQ_API_KEY (and optionally OPENROUTER_API_KEY)
+# Edit .env: MONGODB_URI, JWT_SECRET_KEY, GROQ_API_KEY, optional ADMIN_EMAIL/ADMIN_PASSWORD
 
-# 4. Start the server
 uvicorn main:app --reload --port 8000
 ```
 
-API docs available at: http://localhost:8000/docs
+API docs: http://localhost:8000/docs
 
 ---
 
-### Frontend
+### 3. Frontend
 
 ```bash
 cd frontend
-
-# 1. Install dependencies
 npm install
-
-# 2. Start the dev server
 npm run dev
 ```
 
 Open: http://localhost:5173
 
-The Vite proxy forwards `/api/*` → `http://localhost:8000` automatically.
+The Vite proxy forwards `/api/*` → `http://localhost:8000`.
 
 ---
 
-### Environment variables
+## Environment variables
 
-| Variable | Required | Default | Description |
-|---|---|---|---|
-| `GROQ_API_KEY` | Yes* | — | Groq API key (primary provider) |
-| `OPENROUTER_API_KEY` | Yes* | — | OpenRouter key (fallback) |
-| `GROQ_MODEL` | No | `llama-3.3-70b-versatile` | Groq model ID |
-| `OPENROUTER_MODEL` | No | `deepseek/deepseek-chat` | OpenRouter model ID |
-| `MAX_CHUNK_SIZE` | No | `500` | Words per retrieval chunk |
-| `CHUNK_OVERLAP` | No | `50` | Overlapping words between chunks |
-| `MAX_CHUNKS_FOR_RETRIEVAL` | No | `5` | Top-k chunks injected into chat |
+| Variable | Required | Description |
+|---|---|---|
+| `MONGODB_URI` | Yes | MongoDB connection string |
+| `MONGODB_DB_NAME` | No | Database name (default: `clauseguard`) |
+| `JWT_SECRET_KEY` | Yes | Long random secret for signing tokens |
+| `GROQ_API_KEY` | Yes* | Groq API key (primary AI) |
+| `OPENROUTER_API_KEY` | Yes* | OpenRouter fallback |
+| `ADMIN_EMAIL` | No | Bootstrap admin email (created once on startup) |
+| `ADMIN_PASSWORD` | No | Bootstrap admin password |
+| `UPLOAD_DIR` | No | PDF storage directory (default: `uploads`) |
+| `MAX_UPLOAD_BYTES` | No | Upload limit (default: 20MB) |
 
-*At least one of `GROQ_API_KEY` or `OPENROUTER_API_KEY` must be set.
+\*At least one AI provider key is required.
 
 ---
 
 ## API Reference
 
-| Method | Path | Description |
-|---|---|---|
-| `POST` | `/api/documents/upload` | Upload a PDF |
-| `POST` | `/api/documents/{id}/analyze` | Trigger LLM analysis |
-| `GET` | `/api/documents/{id}` | Get metadata + cached analysis |
-| `POST` | `/api/chat` | Send a grounded chat message |
-| `GET` | `/health` | Health check |
+| Method | Path | Auth | Description |
+|---|---|---|---|
+| `POST` | `/api/auth/signup` | — | Create account |
+| `POST` | `/api/auth/login` | — | Login, receive JWT |
+| `GET` | `/api/auth/me` | User | Current profile |
+| `POST` | `/api/documents/upload` | User | Upload PDF |
+| `GET` | `/api/documents` | User | List your documents |
+| `GET` | `/api/documents/{id}` | User | Document metadata + analysis |
+| `DELETE` | `/api/documents/{id}` | User | Delete own document |
+| `POST` | `/api/documents/{id}/analyze` | User | Run LLM analysis |
+| `GET` | `/api/chat` | User | List chat threads |
+| `GET` | `/api/chat/{document_id}` | User | Chat history for document |
+| `POST` | `/api/chat` | User | Send message |
+| `GET` | `/api/admin/users` | Admin | List users |
+| `GET` | `/api/admin/documents` | Admin | List all documents |
+| `DELETE` | `/api/admin/documents/{id}` | Admin | Delete any document |
+| `GET` | `/health` | — | Health check |
+
+Send `Authorization: Bearer <token>` on protected routes.
+
+---
+
+## Tests
+
+```bash
+cd backend
+source .venv/bin/activate
+pytest
+```
+
+Uses database `clauseguard_test` and directory `uploads_test` (see `tests/conftest.py`).
 
 ---
 
 ## Limitations
 
 - Scanned / image-only PDFs are not supported (no OCR).
-- The in-memory store resets on server restart.
-- Analysis is capped at 8 000 words; longer documents are truncated at the beginning.
+- Analysis is capped at 8 000 words.
 - Not a substitute for qualified legal advice.

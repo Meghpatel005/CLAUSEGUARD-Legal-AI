@@ -75,3 +75,20 @@ class ChatRequest(BaseModel):
 class ChatResponse(BaseModel):
     response: str
     sources_used: int
+
+
+class ChatHistoryResponse(BaseModel):
+    document_id: str
+    messages: List[ChatMessage]
+
+
+class DocumentListItem(BaseModel):
+    document_id: str
+    filename: str
+    page_count: int
+    word_count: int
+    uploaded_at: str
+    is_analyzed: bool
+    status: str
+    file_size: int
+    owner_id: Optional[str] = None

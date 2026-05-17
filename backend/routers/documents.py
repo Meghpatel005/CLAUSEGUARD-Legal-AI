@@ -1,5 +1,5 @@
 """
-Document router — upload and analysis endpoints.
+Document router — upload, list, analyze, delete (user-scoped).
 """
 
 from __future__ import annotations
@@ -8,87 +8,93 @@ import logging
 
 from fastapi import APIRouter, File, HTTPException, UploadFile
 
+from auth.dependencies import CurrentUser
 from config import settings
+from models.user import UserRole
 from services.analyzer import analyze_document
 from services.pdf_extractor import extract_text_from_pdf
 from services.text_chunker import chunk_text
-from storage.document_store import document_store
+from storage.document_repository import document_repository
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/documents", tags=["documents"])
 
-_MAX_FILE_BYTES = 20 * 1024 * 1024  # 20 MB
-
 
 @router.post("/upload")
-async def upload_document(file: UploadFile = File(...)):
-    """
-    Accept a PDF upload, extract text, chunk it, and persist it to the store.
-
-    Returns document metadata immediately so the client can display it
-    while the (separate) analysis step runs.
-    """
+async def upload_document(
+    current_user: CurrentUser,
+    file: UploadFile = File(...),
+):
     if not file.filename or not file.filename.lower().endswith(".pdf"):
         raise HTTPException(status_code=400, detail="Only PDF files are accepted.")
 
     content = await file.read()
 
-    if len(content) > _MAX_FILE_BYTES:
-        raise HTTPException(status_code=400, detail="File exceeds the 20 MB limit.")
+    if len(content) > settings.max_upload_bytes:
+        raise HTTPException(status_code=400, detail="File exceeds the upload size limit.")
 
     try:
         text, page_count = extract_text_from_pdf(content)
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc))
-    except Exception as exc:
+    except Exception:
         logger.exception("Unexpected PDF extraction error.")
-        raise HTTPException(status_code=422, detail=f"PDF processing failed: {exc}")
+        raise HTTPException(status_code=422, detail="PDF processing failed.")
 
     chunks = chunk_text(text, settings.max_chunk_size, settings.chunk_overlap)
-    doc_id = document_store.create(file.filename, text, chunks, page_count)
-    doc = document_store.get(doc_id)
+    doc = await document_repository.create(
+        owner_id=current_user.id,
+        original_filename=file.filename,
+        pdf_bytes=content,
+        text=text,
+        chunks=chunks,
+        page_count=page_count,
+    )
 
     return {
-        "document_id": doc_id,
-        "filename": file.filename,
-        "page_count": page_count,
+        "document_id": doc["document_id"],
+        "filename": doc["filename"],
+        "page_count": doc["page_count"],
         "word_count": doc["word_count"],
         "upload_time": doc["uploaded_at"],
     }
 
 
-@router.post("/{document_id}/analyze")
-async def analyze(document_id: str):
-    """
-    Run LLM analysis on an already-uploaded document.
+@router.get("")
+async def list_documents(current_user: CurrentUser):
+    return await document_repository.list_for_user(current_user)
 
-    If the document was previously analyzed the cached result is returned
-    directly, avoiding redundant API calls.
-    """
-    doc = document_store.get(document_id)
+
+@router.post("/{document_id}/analyze")
+async def analyze(document_id: str, current_user: CurrentUser):
+    doc = await document_repository.get_for_user(document_id, current_user)
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found.")
 
-    if doc["is_analyzed"]:
+    if doc["is_analyzed"] and doc["analysis"]:
         logger.info("Returning cached analysis for %s.", document_id)
         return doc["analysis"]
 
     try:
         analysis = await analyze_document(document_id, doc["text"])
-        document_store.set_analysis(document_id, analysis)
+        await document_repository.set_analysis(document_id, analysis)
         return analysis
     except RuntimeError as exc:
         raise HTTPException(status_code=503, detail=str(exc))
-    except Exception as exc:
+    except ValueError as exc:
+        raise HTTPException(status_code=502, detail=str(exc))
+    except Exception:
         logger.exception("Analysis failed for document %s.", document_id)
-        raise HTTPException(status_code=500, detail=f"Analysis failed: {exc}")
+        raise HTTPException(
+            status_code=500,
+            detail="Analysis failed. Check server logs and your AI API keys in backend/.env.",
+        )
 
 
 @router.get("/{document_id}")
-async def get_document(document_id: str):
-    """Return document metadata and analysis (if available)."""
-    doc = document_store.get(document_id)
+async def get_document(document_id: str, current_user: CurrentUser):
+    doc = await document_repository.get_for_user(document_id, current_user)
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found.")
 
@@ -101,3 +107,16 @@ async def get_document(document_id: str):
         "is_analyzed": doc["is_analyzed"],
         "analysis": doc["analysis"],
     }
+
+
+@router.delete("/{document_id}")
+async def delete_document(document_id: str, current_user: CurrentUser):
+    doc = await document_repository.get_for_user(document_id, current_user)
+    if not doc:
+        raise HTTPException(status_code=404, detail="Document not found.")
+
+    if current_user.role != UserRole.ADMIN and doc["owner_id"] != current_user.id:
+        raise HTTPException(status_code=403, detail="Not allowed to delete this document.")
+
+    await document_repository.delete(document_id)
+    return {"ok": True, "document_id": document_id}

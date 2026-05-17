@@ -11,7 +11,7 @@
  * The phase drives which UI panel is shown.
  */
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   Shield,
   FileText,
@@ -27,7 +27,12 @@ import LoadingState from './components/LoadingState.jsx';
 import AnalysisPanel from './components/AnalysisPanel.jsx';
 import ChatPanel from './components/ChatPanel.jsx';
 
-import { uploadDocument, analyzeDocument } from './services/api.js';
+import {
+  uploadDocument,
+  analyzeDocument,
+  getDocument,
+  listDocuments,
+} from './services/api.js';
 import { useAuth } from './auth/AuthContext.jsx';
 import { navigate } from './lib/router.js';
 
@@ -141,6 +146,27 @@ export default function App() {
 
   // UI state
   const [activeTab, setActiveTab] = useState('analysis');
+  const [pastDocuments, setPastDocuments] = useState([]);
+  const [loadingPast, setLoadingPast] = useState(false);
+
+  useEffect(() => {
+    if (phase !== 'idle' && phase !== 'error') return;
+    let cancelled = false;
+    (async () => {
+      setLoadingPast(true);
+      try {
+        const docs = await listDocuments();
+        if (!cancelled) setPastDocuments(docs);
+      } catch {
+        if (!cancelled) setPastDocuments([]);
+      } finally {
+        if (!cancelled) setLoadingPast(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [phase]);
 
   // ── Handlers ──────────────────────────────────────────────────────────────
 
@@ -171,6 +197,32 @@ export default function App() {
     setActiveTab('analysis');
   };
 
+  const handleOpenDocument = async (documentId) => {
+    setErrorMsg(null);
+    setPhase('analyzing');
+    try {
+      const doc = await getDocument(documentId);
+      setDocMeta({
+        document_id: doc.document_id,
+        filename: doc.filename,
+        page_count: doc.page_count,
+        word_count: doc.word_count,
+        upload_time: doc.uploaded_at,
+      });
+      if (doc.is_analyzed && doc.analysis) {
+        setAnalysis(doc.analysis);
+        setPhase('ready');
+      } else {
+        const analysisResult = await analyzeDocument(documentId);
+        setAnalysis(analysisResult);
+        setPhase('ready');
+      }
+    } catch (err) {
+      setErrorMsg(err.message);
+      setPhase('error');
+    }
+  };
+
   const handleDismissError = () => {
     setErrorMsg(null);
     if (phase === 'error') setPhase('idle');
@@ -191,7 +243,34 @@ export default function App() {
             </div>
           </div>
         )}
-        <UploadZone onUpload={handleUpload} disabled={false} />
+        <div className="min-h-screen flex flex-col">
+          <UploadZone onUpload={handleUpload} disabled={false} />
+          {(loadingPast || pastDocuments.length > 0) && (
+            <div className="max-w-2xl mx-auto w-full px-4 pb-12 -mt-4">
+              <h2 className="text-sm font-medium text-gray-400 mb-3">Your documents</h2>
+              {loadingPast ? (
+                <p className="text-xs text-gray-500">Loading…</p>
+              ) : (
+                <ul className="space-y-2">
+                  {pastDocuments.map((d) => (
+                    <li key={d.document_id}>
+                      <button
+                        type="button"
+                        onClick={() => handleOpenDocument(d.document_id)}
+                        className="w-full text-left rounded-xl border border-surface-3 bg-surface-1 hover:border-brand/40 px-4 py-3 transition-colors"
+                      >
+                        <p className="text-sm text-gray-200 truncate">{d.filename}</p>
+                        <p className="text-xs text-gray-500 mt-1">
+                          {d.page_count} pages · {d.is_analyzed ? 'Analyzed' : 'Pending analysis'}
+                        </p>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
+        </div>
       </>
     );
   }

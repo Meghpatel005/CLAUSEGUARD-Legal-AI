@@ -4,7 +4,8 @@ import AuthLayout from '../auth/AuthLayout';
 import { navigate } from '../lib/router';
 
 export default function SignUpPage() {
-  const { signUp, signOut, configured } = useAuth();
+  const { signUp } = useAuth();
+  const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -14,14 +15,8 @@ export default function SignUpPage() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError(null);
-    if (!configured) {
-      setError(
-        'Firebase is not configured. Add the VITE_FIREBASE_* variables to frontend/.env.'
-      );
-      return;
-    }
-    if (password.length < 6) {
-      setError('Password must be at least 6 characters.');
+    if (password.length < 8) {
+      setError('Password must be at least 8 characters.');
       return;
     }
     if (password !== confirmPassword) {
@@ -30,8 +25,7 @@ export default function SignUpPage() {
     }
     setSubmitting(true);
     try {
-      await signUp(email.trim(), password);
-      await signOut();
+      await signUp(name.trim(), email.trim(), password);
       navigate('/login?registered=1');
     } catch (err) {
       setError(err.message ?? 'Sign up failed.');
@@ -57,15 +51,22 @@ export default function SignUpPage() {
         </span>
       }
     >
-      {!configured && (
-        <p className="mb-4 rounded-lg border border-risk-medium/40 bg-risk-medium/10 px-3 py-2 text-sm text-risk-medium">
-          Firebase env vars are missing. Copy{' '}
-          <code className="font-mono text-xs">.env.example</code> to{' '}
-          <code className="font-mono text-xs">.env</code> and fill in your Firebase web app config.
-        </p>
-      )}
-
       <form onSubmit={handleSubmit} className="space-y-4">
+        <div>
+          <label htmlFor="signup-name" className="mb-1.5 block text-xs font-medium text-gray-400">
+            Full name
+          </label>
+          <input
+            id="signup-name"
+            type="text"
+            autoComplete="name"
+            required
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            className="w-full rounded-lg border border-surface-3 bg-surface-0 px-3 py-2.5 text-sm text-gray-100 placeholder:text-gray-600 focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand"
+            placeholder="Jane Doe"
+          />
+        </div>
         <div>
           <label htmlFor="signup-email" className="mb-1.5 block text-xs font-medium text-gray-400">
             Email
@@ -93,7 +94,7 @@ export default function SignUpPage() {
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             className="w-full rounded-lg border border-surface-3 bg-surface-0 px-3 py-2.5 text-sm text-gray-100 placeholder:text-gray-600 focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand"
-            placeholder="At least 6 characters"
+            placeholder="At least 8 characters"
           />
         </div>
         <div>

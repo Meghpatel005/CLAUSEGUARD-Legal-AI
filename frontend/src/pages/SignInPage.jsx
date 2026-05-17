@@ -10,13 +10,14 @@ function safeNext() {
 }
 
 export default function SignInPage() {
-  const { signIn, user, loading, configured } = useAuth();
+  const { signIn, user, loading } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState(null);
   const [submitting, setSubmitting] = useState(false);
 
   const registered = new URLSearchParams(window.location.search).get('registered') === '1';
+  const sessionExpired = new URLSearchParams(window.location.search).get('session') === 'expired';
 
   useEffect(() => {
     if (loading || !user) return;
@@ -26,12 +27,6 @@ export default function SignInPage() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError(null);
-    if (!configured) {
-      setError(
-        'Firebase is not configured. Add the VITE_FIREBASE_* variables to frontend/.env (see project README or Firebase setup).'
-      );
-      return;
-    }
     setSubmitting(true);
     try {
       await signIn(email.trim(), password);
@@ -68,11 +63,9 @@ export default function SignInPage() {
         </span>
       }
     >
-      {!configured && (
+      {sessionExpired && (
         <p className="mb-4 rounded-lg border border-risk-medium/40 bg-risk-medium/10 px-3 py-2 text-sm text-risk-medium">
-          Firebase env vars are missing. Copy{' '}
-          <code className="font-mono text-xs">.env.example</code> to{' '}
-          <code className="font-mono text-xs">.env</code> and fill in your Firebase web app config.
+          Your session expired (often after updating server settings). Please sign in again.
         </p>
       )}
 
