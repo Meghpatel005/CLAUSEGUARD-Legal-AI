@@ -13,6 +13,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from config import settings
 from db.connection import close_db, init_db
 from middleware.exception_handlers import register_exception_handlers
+from middleware.rate_limit import register_rate_limiting
 from routers import admin, auth, chat, documents
 from services.bootstrap import bootstrap_admin_user
 from storage.file_storage import ensure_upload_dir
@@ -35,11 +36,12 @@ async def lifespan(_app: FastAPI):
 app = FastAPI(
     title="ClauseGuard AI",
     description="Legal document analysis and clause risk assessment API.",
-    version="2.0.0",
+    version="2.1.0",
     lifespan=lifespan,
 )
 
 register_exception_handlers(app)
+register_rate_limiting(app)
 
 app.add_middleware(
     CORSMiddleware,
@@ -57,4 +59,4 @@ app.include_router(admin.router)
 
 @app.get("/health", tags=["meta"])
 async def health():
-    return {"status": "ok", "service": "ClauseGuard AI", "version": "2.0.0"}
+    return {"status": "ok", "service": "ClauseGuard AI", "version": "2.1.0"}

@@ -29,7 +29,8 @@ import ChatPanel from './components/ChatPanel.jsx';
 
 import {
   uploadDocument,
-  analyzeDocument,
+  waitForAnalysis,
+  startAnalysis,
   getDocument,
   listDocuments,
 } from './services/api.js';
@@ -148,6 +149,7 @@ export default function App() {
   const [activeTab, setActiveTab] = useState('analysis');
   const [pastDocuments, setPastDocuments] = useState([]);
   const [loadingPast, setLoadingPast] = useState(false);
+  const [analysisStatus, setAnalysisStatus] = useState('');
 
   useEffect(() => {
     if (phase !== 'idle' && phase !== 'error') return;
@@ -180,8 +182,17 @@ export default function App() {
       setDocMeta(uploadResult);
 
       setPhase('analyzing');
-      const analysisResult = await analyzeDocument(uploadResult.document_id);
+      setAnalysisStatus('Starting AI analysis…');
+      await startAnalysis(uploadResult.document_id);
+      const analysisResult = await waitForAnalysis(uploadResult.document_id, {
+        onStatus: (doc) => {
+          if (doc.status === 'processing') {
+            setAnalysisStatus('Analysing clauses and risks (this may take 30–60 seconds)…');
+          }
+        },
+      });
       setAnalysis(analysisResult);
+      setAnalysisStatus('');
       setPhase('ready');
     } catch (err) {
       setErrorMsg(err.message);
@@ -200,6 +211,7 @@ export default function App() {
   const handleOpenDocument = async (documentId) => {
     setErrorMsg(null);
     setPhase('analyzing');
+    setAnalysisStatus('Loading document…');
     try {
       const doc = await getDocument(documentId);
       setDocMeta({
@@ -211,10 +223,24 @@ export default function App() {
       });
       if (doc.is_analyzed && doc.analysis) {
         setAnalysis(doc.analysis);
+        setAnalysisStatus('');
+        setPhase('ready');
+      } else if (doc.status === 'processing') {
+        setAnalysisStatus('Analysis in progress…');
+        const analysisResult = await waitForAnalysis(documentId, {
+          onStatus: () => setAnalysisStatus('Still analysing…'),
+        });
+        setAnalysis(analysisResult);
+        setAnalysisStatus('');
         setPhase('ready');
       } else {
-        const analysisResult = await analyzeDocument(documentId);
+        setAnalysisStatus('Starting analysis…');
+        await startAnalysis(documentId);
+        const analysisResult = await waitForAnalysis(documentId, {
+          onStatus: () => setAnalysisStatus('Analysing document…'),
+        });
         setAnalysis(analysisResult);
+        setAnalysisStatus('');
         setPhase('ready');
       }
     } catch (err) {
@@ -281,7 +307,7 @@ export default function App() {
       <div className="min-h-screen flex flex-col">
         <AppHeader docMeta={docMeta} analysis={null} onReset={handleReset} onLogout={handleLogout} />
         <main className="flex-1 max-w-5xl mx-auto w-full px-4 sm:px-6">
-          <LoadingState phase={phase} />
+          <LoadingState phase={phase} statusMessage={analysisStatus} />
         </main>
       </div>
     );

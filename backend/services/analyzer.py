@@ -47,6 +47,8 @@ Return exactly this structure:
       "id": "clause_1",
       "title": "<concise clause name>",
       "text": "<verbatim excerpt from the document, max 200 words>",
+      "page_number": <integer page number where this clause appears, from the --- Page N --- markers>,
+      "citation": "<short quote + Page N reference, e.g. 'Section 4.2 (Page 3)'>",
       "risk_level": "<low|medium|high|critical>",
       "risk_reason": "<one or two sentences explaining the risk or why this clause is notable>",
       "category": "<Termination | Liability | Confidentiality | Payment | IP | Indemnification | Governing Law | Non-Compete | Warranty | other>",
@@ -63,6 +65,8 @@ Guidelines:
 - The lawyer_summary should feel like a real lawyer explaining the risk in plain English.
 - overall_risk_score should be consistent with overall_risk_level:
     low 0-25 | medium 26-50 | high 51-75 | critical 76-100
+- The document text includes --- Page N --- markers; use them for accurate page_number and citation on every clause.
+- lawyer_summary fields should mention page references where relevant (e.g. "See Page 5").
 """
 
 
@@ -118,6 +122,13 @@ def _normalise_analysis(data: Dict[str, Any], document_id: str) -> Dict[str, Any
         clause.setdefault("category", "General")
         clause.setdefault("risk_type", "general risk")
         clause.setdefault("confidence_score", 80)
+        clause.setdefault("page_number", None)
+        page = clause.get("page_number")
+        citation = clause.get("citation")
+        if not citation and page:
+            clause["citation"] = f"Page {page}"
+        elif not citation:
+            clause["citation"] = clause.get("title", f"Clause {idx + 1}")
         if clause["risk_level"] not in valid_risk:
             clause["risk_level"] = "medium"
 

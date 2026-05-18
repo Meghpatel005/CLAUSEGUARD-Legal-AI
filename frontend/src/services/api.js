@@ -1,32 +1,14 @@
 /**
- * api.js — ClauseGuard AI HTTP client (JWT-authenticated).
+ * api.js — ClauseGuard AI HTTP client (HttpOnly cookie auth).
  */
 
 import axios from 'axios';
 import { navigate } from '../lib/router.js';
 
-const TOKEN_KEY = 'clauseguard_access_token';
-
 const http = axios.create({
   baseURL: import.meta.env.VITE_API_URL ?? '',
   timeout: 120_000,
-});
-
-export function getStoredToken() {
-  return localStorage.getItem(TOKEN_KEY);
-}
-
-export function setStoredToken(token) {
-  if (token) localStorage.setItem(TOKEN_KEY, token);
-  else localStorage.removeItem(TOKEN_KEY);
-}
-
-http.interceptors.request.use((config) => {
-  const token = getStoredToken();
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
-  return config;
+  withCredentials: true,
 });
 
 http.interceptors.response.use(
@@ -36,17 +18,19 @@ http.interceptors.response.use(
     const detail = err.response?.data?.detail ?? err.message ?? 'An unexpected error occurred.';
     const detailText = typeof detail === 'string' ? detail : JSON.stringify(detail);
 
-    // Stale token (e.g. after JWT_SECRET_KEY change or server restart) — force re-login
     if (
       status === 401 &&
       (detailText.toLowerCase().includes('token') ||
         detailText.toLowerCase().includes('not authenticated'))
     ) {
-      setStoredToken(null);
       const onApp = typeof window !== 'undefined' && window.location.pathname.startsWith('/app');
       if (onApp && !window.location.pathname.startsWith('/login')) {
         navigate('/login?session=expired');
       }
+    }
+
+    if (status === 429) {
+      return Promise.reject(new Error('Too many requests. Please wait a moment and try again.'));
     }
 
     const message =
@@ -63,23 +47,21 @@ http.interceptors.response.use(
 
 export async function signup(name, email, password) {
   const { data } = await http.post('/api/auth/signup', { name, email, password });
-  setStoredToken(data.access_token);
   return data;
 }
 
 export async function login(email, password) {
   const { data } = await http.post('/api/auth/login', { email, password });
-  setStoredToken(data.access_token);
   return data;
+}
+
+export async function logout() {
+  await http.post('/api/auth/logout');
 }
 
 export async function getMe() {
   const { data } = await http.get('/api/auth/me');
   return data;
-}
-
-export function logout() {
-  setStoredToken(null);
 }
 
 // ── Documents ──────────────────────────────────────────────────────────────
@@ -98,9 +80,40 @@ export async function listDocuments() {
   return data;
 }
 
-export async function analyzeDocument(documentId) {
+export async function startAnalysis(documentId) {
   const { data } = await http.post(`/api/documents/${documentId}/analyze`);
   return data;
+}
+
+/** @deprecated use startAnalysis + waitForAnalysis */
+export async function analyzeDocument(documentId) {
+  const queued = await startAnalysis(documentId);
+  if (queued.analysis) return queued.analysis;
+  if (queued.status === 'processing' || !queued.analysis) {
+    return waitForAnalysis(documentId);
+  }
+  return queued;
+}
+
+export async function waitForAnalysis(
+  documentId,
+  { onStatus, intervalMs = 2500, maxWaitMs = 600_000 } = {}
+) {
+  const deadline = Date.now() + maxWaitMs;
+  while (Date.now() < deadline) {
+    const doc = await getDocument(documentId);
+    onStatus?.(doc);
+
+    if (doc.is_analyzed && doc.analysis) {
+      return doc.analysis;
+    }
+    const st = doc.analysis_status ?? doc.status;
+    if (st === 'failed') {
+      throw new Error(doc.analysis_error || 'Analysis failed.');
+    }
+    await new Promise((r) => setTimeout(r, intervalMs));
+  }
+  throw new Error('Analysis is taking longer than expected. Check back in your document list.');
 }
 
 export async function getDocument(documentId) {
@@ -117,13 +130,13 @@ export async function downloadAnnotatedPDF(documentId) {
   const { data, headers } = await http.get(`/api/documents/${documentId}/annotated`, {
     responseType: 'blob',
   });
-  
+
   let filename = `annotated_document_${documentId}.pdf`;
   const disposition = headers['content-disposition'];
   if (disposition && disposition.indexOf('filename=') !== -1) {
     const filenameRegex = /filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/;
     const matches = filenameRegex.exec(disposition);
-    if (matches != null && matches[1]) { 
+    if (matches != null && matches[1]) {
       filename = matches[1].replace(/['"]/g, '');
     }
   }

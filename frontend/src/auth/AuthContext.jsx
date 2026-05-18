@@ -6,7 +6,12 @@ import {
   useMemo,
   useState,
 } from 'react';
-import { getMe, getStoredToken, login as apiLogin, logout as apiLogout, signup as apiSignup } from '../services/api.js';
+import {
+  getMe,
+  login as apiLogin,
+  logout as apiLogout,
+  signup as apiSignup,
+} from '../services/api.js';
 
 const AuthContext = createContext(null);
 
@@ -26,17 +31,11 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true);
 
   const refreshUser = useCallback(async () => {
-    const token = getStoredToken();
-    if (!token) {
-      setUser(null);
-      return null;
-    }
     try {
       const me = await getMe();
       setUser(me);
       return me;
     } catch {
-      apiLogout();
       setUser(null);
       return null;
     }
@@ -71,7 +70,11 @@ export function AuthProvider({ children }) {
   }, []);
 
   const signOut = useCallback(async () => {
-    apiLogout();
+    try {
+      await apiLogout();
+    } catch {
+      /* cookie may already be cleared */
+    }
     setUser(null);
   }, []);
 

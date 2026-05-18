@@ -14,7 +14,8 @@ def _doc_to_api(doc: dict) -> Dict[str, Any]:
     """Map MongoDB document to API-facing shape (backward compatible)."""
     doc_id = str(doc["_id"])
     analysis = doc.get("analysis")
-    is_analyzed = doc.get("status") == "analyzed" or analysis is not None
+    status = doc.get("status", "uploaded")
+    is_analyzed = status == "analyzed" or analysis is not None
     return {
         "document_id": doc_id,
         "owner_id": doc["owner_id"],
@@ -26,8 +27,11 @@ def _doc_to_api(doc: dict) -> Dict[str, Any]:
         "uploaded_at": doc["upload_timestamp"].isoformat(),
         "upload_timestamp": doc["upload_timestamp"],
         "is_analyzed": is_analyzed,
-        "status": doc.get("status", "uploaded"),
+        "status": status,
+        "analysis_status": status,
+        "analysis_error": doc.get("analysis_error"),
         "analysis": analysis,
+        "page_texts": doc.get("page_texts", []),
         "file_size": doc.get("file_size", 0),
         # Internal fields for services
         "text": doc.get("extracted_text", ""),
@@ -48,6 +52,7 @@ class DocumentRepository:
         text: str,
         chunks: List[str],
         page_count: int,
+        page_texts: List[str] | None = None,
     ) -> Dict[str, Any]:
         stored_name, _path = save_pdf(pdf_bytes, original_filename)
         now = datetime.now(timezone.utc)
@@ -63,6 +68,8 @@ class DocumentRepository:
             "status": "uploaded",
             "file_size": len(pdf_bytes),
             "word_count": len(text.split()),
+            "page_texts": page_texts or [],
+            "analysis_error": None,
         }
         result = await self._col.insert_one(doc)
         doc["_id"] = result.inserted_id
@@ -100,17 +107,44 @@ class DocumentRepository:
                     "uploaded_at": api["uploaded_at"],
                     "is_analyzed": api["is_analyzed"],
                     "status": api["status"],
+                    "analysis_status": api["status"],
+                    "analysis_error": api.get("analysis_error"),
                     "file_size": api["file_size"],
                     "owner_id": api["owner_id"],
                 }
             )
         return items
 
+    async def set_analysis_status(self, document_id: str, status: str) -> None:
+        oid = ObjectId(document_id)
+        await self._col.update_one(
+            {"_id": oid},
+            {"$set": {"status": status, "analysis_error": None}},
+        )
+
+    async def set_analysis_failed(self, document_id: str, error: str) -> None:
+        oid = ObjectId(document_id)
+        await self._col.update_one(
+            {"_id": oid},
+            {
+                "$set": {
+                    "status": "failed",
+                    "analysis_error": error[:500],
+                }
+            },
+        )
+
     async def set_analysis(self, document_id: str, analysis: dict) -> None:
         oid = ObjectId(document_id)
         await self._col.update_one(
             {"_id": oid},
-            {"$set": {"analysis": analysis, "status": "analyzed"}},
+            {
+                "$set": {
+                    "analysis": analysis,
+                    "status": "analyzed",
+                    "analysis_error": None,
+                }
+            },
         )
 
     async def delete(self, document_id: str) -> bool:

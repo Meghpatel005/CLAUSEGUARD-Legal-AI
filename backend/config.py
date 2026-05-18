@@ -44,6 +44,24 @@ class Settings(BaseSettings):
     admin_password: str = ""
     admin_name: str = "Admin"
 
+    # HttpOnly auth cookie
+    auth_cookie_name: str = "clauseguard_token"
+    auth_cookie_secure: bool = False  # set True behind HTTPS in production
+    auth_cookie_samesite: str = "lax"
+
+    # Background analysis (set true in tests for synchronous analyze)
+    analysis_sync: bool = False
+
+    # Rate limiting
+    rate_limit_enabled: bool = True
+    rate_limit_default: str = "120/minute"
+    rate_limit_analyze: str = "15/hour"
+    rate_limit_auth: str = "30/minute"
+
+    # OCR (scanned PDFs) — requires: pip install pytesseract pillow && brew install tesseract
+    ocr_enabled: bool = True
+    ocr_dpi: int = 200
+
     @field_validator("cors_origins", mode="before")
     @classmethod
     def _strip_cors(cls, value: str) -> str:

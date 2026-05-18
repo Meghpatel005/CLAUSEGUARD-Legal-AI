@@ -1,28 +1,44 @@
 from __future__ import annotations
 
-from typing import Annotated
+from typing import Annotated, Optional
 
-from fastapi import Depends, HTTPException, status
+from fastapi import Cookie, Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from auth.jwt_handler import decode_access_token
+from config import settings
 from models.user import UserInDB, UserRole
 from storage.user_repository import user_repository
 
 _bearer = HTTPBearer(auto_error=False)
 
 
+def _token_from_request(
+    credentials: HTTPAuthorizationCredentials | None,
+    cookie_token: Optional[str],
+) -> Optional[str]:
+    # Prefer explicit Bearer header (API clients/tests); fall back to HttpOnly cookie (browser).
+    if credentials and credentials.scheme.lower() == "bearer":
+        return credentials.credentials
+    if cookie_token:
+        return cookie_token
+    return None
+
+
 async def get_current_user(
+    request: Request,
     credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(_bearer)],
+    cookie_token: Annotated[Optional[str], Cookie(alias=settings.auth_cookie_name)] = None,
 ) -> UserInDB:
-    if credentials is None or credentials.scheme.lower() != "bearer":
+    token = _token_from_request(credentials, cookie_token)
+    if not token:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Not authenticated.",
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    payload = decode_access_token(credentials.credentials)
+    payload = decode_access_token(token)
     if not payload or not payload.get("sub"):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -37,6 +53,7 @@ async def get_current_user(
             detail="User not found.",
             headers={"WWW-Authenticate": "Bearer"},
         )
+    request.state.user_id = user.id
     return user
 
 

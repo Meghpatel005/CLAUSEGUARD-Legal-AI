@@ -4,19 +4,21 @@
 
 import { Shield } from 'lucide-react';
 
-export default function LoadingState({ phase }) {
+export default function LoadingState({ phase, statusMessage }) {
   const messages = {
     uploading: {
       title: 'Uploading document…',
-      subtitle: 'Extracting text and preparing chunks for analysis.',
+      subtitle: 'Validating PDF, extracting text (OCR if scanned), and preparing chunks.',
     },
     analyzing: {
       title: 'Analysing clauses…',
-      subtitle: 'Identifying key provisions, risk indicators, and party obligations. This may take 15–30 seconds.',
+      subtitle:
+        statusMessage ||
+        'AI is reviewing provisions, risk levels, and page citations. You can keep this tab open.',
     },
   };
 
-  const msg = messages[phase] ?? { title: 'Processing…', subtitle: '' };
+  const msg = messages[phase] ?? { title: 'Processing…', subtitle: statusMessage || '' };
 
   return (
     <div className="flex flex-col items-center justify-center py-24 gap-6">

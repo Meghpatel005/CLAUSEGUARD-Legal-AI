@@ -9,16 +9,22 @@ from httpx import ASGITransport, AsyncClient
 os.environ.setdefault("MONGODB_DB_NAME", "clauseguard_test")
 os.environ.setdefault("JWT_SECRET_KEY", "test-secret-key-for-pytest-only")
 os.environ.setdefault("UPLOAD_DIR", "uploads_test")
+os.environ.setdefault("RATE_LIMIT_ENABLED", "false")
+os.environ.setdefault("ANALYSIS_SYNC", "true")
+os.environ["ADMIN_EMAIL"] = ""
+os.environ["ADMIN_PASSWORD"] = ""
 
-from db.connection import get_db  # noqa: E402
+from db.connection import close_db, get_db, init_db  # noqa: E402
 from main import app  # noqa: E402
 
 
 @pytest.fixture
 async def client() -> AsyncGenerator[AsyncClient, None]:
-    transport = ASGITransport(app=app, lifespan="on")
+    await init_db()
+    transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
         yield ac
+    await close_db()
 
 
 @pytest.fixture(autouse=True)

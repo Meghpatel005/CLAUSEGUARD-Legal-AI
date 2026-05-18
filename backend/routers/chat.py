@@ -6,10 +6,11 @@ from __future__ import annotations
 
 import logging
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 
 from auth.dependencies import CurrentUser
 from config import settings
+from services.audit import log_audit
 from models.schemas import ChatHistoryResponse, ChatMessage, ChatRequest, ChatResponse
 from services.ai_client import ai_client
 from services.retriever import retrieve_relevant_chunks
@@ -45,13 +46,15 @@ Instructions:
 
 
 @router.get("")
-async def list_chat_threads(current_user: CurrentUser):
+async def list_chat_threads(request: Request, current_user: CurrentUser):
     """List document chat threads for the current user."""
     return await chat_repository.list_threads_for_user(current_user.id)
 
 
 @router.get("/{document_id}", response_model=ChatHistoryResponse)
-async def get_chat_history(document_id: str, current_user: CurrentUser):
+async def get_chat_history(
+    request: Request, document_id: str, current_user: CurrentUser
+):
     doc = await document_repository.get_for_user(document_id, current_user)
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found.")
@@ -62,7 +65,11 @@ async def get_chat_history(document_id: str, current_user: CurrentUser):
 
 
 @router.post("", response_model=ChatResponse)
-async def chat(request: ChatRequest, current_user: CurrentUser) -> ChatResponse:
+async def chat(
+    http_request: Request,
+    request: ChatRequest,
+    current_user: CurrentUser,
+) -> ChatResponse:
     doc = await document_repository.get_for_user(request.document_id, current_user)
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found.")
@@ -123,6 +130,15 @@ async def chat(request: ChatRequest, current_user: CurrentUser) -> ChatResponse:
                 "sources_used": len(relevant_chunks),
             },
         ],
+    )
+
+    await log_audit(
+        request=http_request,
+        user_id=current_user.id,
+        action="chat.message",
+        resource_type="document",
+        resource_id=request.document_id,
+        metadata={"sources_used": len(relevant_chunks)},
     )
 
     return ChatResponse(response=response_text, sources_used=len(relevant_chunks))

@@ -74,6 +74,11 @@ export default function ClauseCard({ clause, index }) {
                 {clause.risk_type}
               </span>
             )}
+            {clause.page_number != null && (
+              <span className="text-[10px] font-medium px-2 py-0.5 rounded border bg-surface-2 text-gray-300 border-surface-3">
+                Page {clause.page_number}
+              </span>
+            )}
             {clause.confidence_score && (
               <span className="text-[10px] font-medium px-2 py-0.5 rounded border bg-brand/10 text-brand border-brand/20">
                 {clause.confidence_score}% Confident
@@ -90,7 +95,9 @@ export default function ClauseCard({ clause, index }) {
       {/* Expanded content */}
       {expanded && (
         <div className="px-4 pb-4 border-t border-surface-3 pt-4 space-y-4">
-          {/* Clause text excerpt */}
+          {clause.citation && (
+            <p className="text-xs text-brand/90 font-medium">Citation: {clause.citation}</p>
+          )}
           {clause.text && (
             <div className="bg-surface-0 rounded-lg p-3">
               <p className="text-xs text-gray-500 uppercase tracking-wider font-medium mb-2">
