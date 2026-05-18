@@ -170,3 +170,40 @@ export async function listChatThreads() {
   const { data } = await http.get('/api/chat');
   return data;
 }
+
+// ── Admin ──────────────────────────────────────────────────────────────────
+
+export async function getAdminStats() {
+  const { data } = await http.get('/api/admin/stats');
+  return data;
+}
+
+export async function getAdminUsers() {
+  const { data } = await http.get('/api/admin/users');
+  return data;
+}
+
+export async function getAdminDocuments() {
+  const { data } = await http.get('/api/admin/documents');
+  return data;
+}
+
+export async function getAdminRiskyClauses() {
+  const { data } = await http.get('/api/admin/insights/risky-clauses');
+  return data;
+}
+
+export async function adminDeleteUser(userId) {
+  const { data } = await http.delete(`/api/admin/users/${userId}`);
+  return data;
+}
+
+export async function adminDeleteDocument(documentId) {
+  const { data } = await http.delete(`/api/admin/documents/${documentId}`);
+  return data;
+}
+
+export async function adminCreateUser({ name, email, password, role }) {
+  const { data } = await http.post('/api/admin/users', { name, email, password, role });
+  return data;
+}

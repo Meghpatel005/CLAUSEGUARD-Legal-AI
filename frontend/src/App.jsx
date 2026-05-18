@@ -20,6 +20,7 @@ import {
   BarChart2,
   MessageSquare,
   LogOut,
+  ShieldCheck,
 } from 'lucide-react';
 
 import UploadZone from './components/UploadZone.jsx';
@@ -46,7 +47,7 @@ const TABS = [
 
 // ── Header ──────────────────────────────────────────────────────────────────
 
-function AppHeader({ docMeta, analysis, onReset, onLogout }) {
+function AppHeader({ docMeta, analysis, onReset, onLogout, isAdmin }) {
   const LEVEL_DOT = {
     low:      'bg-risk-low',
     medium:   'bg-risk-medium',
@@ -94,6 +95,17 @@ function AppHeader({ docMeta, analysis, onReset, onLogout }) {
           <RefreshCw size={13} />
           <span className="hidden sm:inline">New</span>
         </button>
+        {isAdmin && (
+          <button
+            type="button"
+            onClick={() => navigate('/admin')}
+            className="btn-ghost flex items-center gap-1.5 shrink-0 text-brand-light hover:text-brand"
+            title="Admin dashboard"
+          >
+            <ShieldCheck size={13} />
+            <span className="hidden sm:inline">Admin</span>
+          </button>
+        )}
         <button
           type="button"
           onClick={onLogout}
@@ -130,7 +142,8 @@ function ErrorBanner({ message, onDismiss }) {
 // ── Root component ────────────────────────────────────────────────────────────
 
 export default function App() {
-  const { signOut } = useAuth();
+  const { user, signOut } = useAuth();
+  const isAdmin = user?.role === 'admin';
 
   const handleLogout = async () => {
     await signOut();
@@ -270,6 +283,18 @@ export default function App() {
           </div>
         )}
         <div className="min-h-screen flex flex-col">
+          {isAdmin && (
+            <div className="flex justify-end px-4 pt-3 max-w-5xl mx-auto w-full">
+              <button
+                type="button"
+                onClick={() => navigate('/admin')}
+                className="btn-ghost flex items-center gap-2 text-brand-light border border-brand/30"
+              >
+                <ShieldCheck size={16} />
+                Admin Dashboard
+              </button>
+            </div>
+          )}
           <UploadZone onUpload={handleUpload} disabled={false} />
           {(loadingPast || pastDocuments.length > 0) && (
             <div className="max-w-2xl mx-auto w-full px-4 pb-12 -mt-4">
@@ -305,7 +330,7 @@ export default function App() {
   if (phase === 'uploading' || phase === 'analyzing') {
     return (
       <div className="min-h-screen flex flex-col">
-        <AppHeader docMeta={docMeta} analysis={null} onReset={handleReset} onLogout={handleLogout} />
+        <AppHeader docMeta={docMeta} analysis={null} onReset={handleReset} onLogout={handleLogout} isAdmin={isAdmin} />
         <main className="flex-1 max-w-5xl mx-auto w-full px-4 sm:px-6">
           <LoadingState phase={phase} statusMessage={analysisStatus} />
         </main>
@@ -316,7 +341,7 @@ export default function App() {
   // Ready — full analysis + chat
   return (
     <div className="min-h-screen flex flex-col">
-      <AppHeader docMeta={docMeta} analysis={analysis} onReset={handleReset} onLogout={handleLogout} />
+      <AppHeader docMeta={docMeta} analysis={analysis} onReset={handleReset} onLogout={handleLogout} isAdmin={isAdmin} />
 
       {errorMsg && (
         <ErrorBanner message={errorMsg} onDismiss={handleDismissError} />
