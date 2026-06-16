@@ -1,133 +1,373 @@
 # ClauseGuard AI
 
-A full-stack legal document analysis system. Upload a PDF contract or agreement and get:
+<p align="center">
+  <strong>AI-Powered Legal Contract Analysis Platform</strong>
+</p>
 
-- **Clause identification** — 5–10 key provisions extracted and categorised
-- **Risk assessment** — per-clause and overall risk scoring (low / medium / high / critical)
-- **Plain-language summary** — non-lawyer-friendly explanation of what the document does
-- **Document-grounded chat** — ask questions, get answers cited from the document text
+<p align="center">
+  Upload contracts, identify legal risks, extract critical clauses, generate plain-language summaries, and interact with documents through an AI-powered chat interface.
+</p>
 
 ---
 
-## Architecture
+## Overview
 
+ClauseGuard AI is a full-stack legal intelligence platform designed to help individuals, startups, compliance teams, and legal professionals quickly understand complex contracts and agreements.
+
+The platform leverages Large Language Models (LLMs), document retrieval techniques, and PDF processing pipelines to automatically analyze legal documents, highlight risks, explain legal language in plain English, and provide contextual question-answering grounded in the uploaded document.
+
+### Key Benefits
+
+* Reduce contract review time
+* Identify potentially risky clauses
+* Understand legal language without legal expertise
+* Ask questions directly about uploaded agreements
+* Maintain secure document ownership and chat history
+* Support multi-user collaboration through authentication and role-based access
+
+---
+
+# Features
+
+## Legal Document Analysis
+
+Upload PDF contracts and automatically receive:
+
+* Clause extraction and categorization
+* Risk-level assessment
+* Legal issue identification
+* Plain-English explanations
+* Overall document summary
+
+## AI-Powered Contract Chat
+
+Ask questions such as:
+
+* "What are the termination conditions?"
+* "Does this agreement contain automatic renewal?"
+* "What are my liabilities under this contract?"
+* "Are there any high-risk clauses?"
+
+Responses are generated using document-grounded retrieval to ensure relevance to the uploaded contract.
+
+## Risk Assessment Engine
+
+Each contract is analyzed for:
+
+* Liability clauses
+* Termination provisions
+* Confidentiality obligations
+* Payment terms
+* Indemnification language
+* Renewal conditions
+* Compliance concerns
+
+Risk levels are categorized as:
+
+* Low
+* Medium
+* High
+* Critical
+
+## Secure User Authentication
+
+* JWT Authentication
+* Password hashing using bcrypt
+* Protected API routes
+* User-specific document ownership
+* Persistent chat history
+
+## Administrative Dashboard
+
+Administrators can:
+
+* View registered users
+* Monitor uploaded documents
+* Manage platform content
+* Remove inappropriate or unnecessary files
+
+---
+
+# System Architecture
+
+```text
+┌─────────────────────────┐
+│      React Frontend     │
+│    Vite + TailwindCSS   │
+└────────────┬────────────┘
+             │
+             ▼
+┌─────────────────────────┐
+│      FastAPI Backend    │
+│ Authentication & APIs   │
+└────────────┬────────────┘
+             │
+     ┌───────┼────────┐
+     ▼                ▼
+
+PDF Processing      AI Services
+(pdfplumber,        Groq/OpenRouter
+ PyMuPDF)           LLM Integration
+
+     ▼                ▼
+
+Document Chunks → Retrieval Engine
+
+             ▼
+
+       MongoDB Database
 ```
-clauseguard/
-├── backend/               FastAPI (Python 3.11+)
-│   ├── main.py            App entry, CORS, router wiring
-│   ├── config.py          Pydantic-settings (reads .env)
-│   ├── models/schemas.py  All Pydantic request/response types
-│   ├── storage/           In-memory document store (dict-based)
+
+---
+
+# Technology Stack
+
+## Frontend
+
+* React 18
+* Vite
+* Tailwind CSS
+* Axios
+* Lucide React
+
+## Backend
+
+* FastAPI
+* Python 3.11+
+* Motor
+* PyMongo
+* JWT Authentication
+* Pydantic
+
+## AI & Document Processing
+
+* Groq API
+* OpenRouter API
+* PDFPlumber
+* PyMuPDF
+* Retrieval-Augmented Processing
+
+## Database
+
+* MongoDB
+
+---
+
+# Project Structure
+
+```text
+CLAUSEGUARD/
+│
+├── backend/
+│   ├── auth/
+│   ├── db/
+│   ├── middleware/
+│   ├── models/
+│   ├── routers/
 │   ├── services/
-│   │   ├── ai_client.py   Groq primary → OpenRouter fallback
-│   │   ├── pdf_extractor  pdfplumber text extraction
-│   │   ├── text_chunker   Overlapping word-count chunker
-│   │   ├── analyzer       LLM structured JSON analysis
-│   │   └── retriever      TF-IDF chunk retrieval (no vector DB)
-│   └── routers/           /api/documents  +  /api/chat
-└── frontend/              Vite + React 18 + Tailwind CSS
-    └── src/
-        ├── App.jsx         Phase state machine (idle→upload→analyze→ready)
-        ├── services/api.js Axios client, exact backend contract
-        └── components/     UploadZone, AnalysisPanel, ClauseCard,
-                            RiskBadge, ChatPanel, LoadingState
+│   ├── storage/
+│   ├── tests/
+│   └── uploads/
+│
+├── frontend/
+│   ├── src/
+│   ├── public/
+│   └── dist/
+│
+└── README.md
 ```
 
-### Key design decisions
+---
 
-| Decision | Rationale |
-|---|---|
-| In-memory document store | Removes DB operational overhead; valid for single-user/session use. Swap for SQLite/Postgres without touching other layers. |
-| TF-IDF retrieval | Lightweight, reproducible, no external index service. Sufficient for single-document RAG. |
-| Groq → OpenRouter fallback | Keeps the app operational during Groq rate-limit windows. |
-| Word-count chunking with overlap | Clause boundaries don't align with character counts; overlap prevents silent mid-clause splits. |
-| JSON-mode LLM analysis | Structured output eliminates parsing fragility; `_extract_json` handles fence leakage from non-compliant model variants. |
+# Installation
+
+## Prerequisites
+
+Before starting, ensure you have:
+
+* Python 3.11+
+* Node.js 18+
+* MongoDB
+* Groq API Key or OpenRouter API Key
 
 ---
 
-## Setup
-
-### Prerequisites
-
-- Python 3.11+
-- Node 18+
-- A [Groq API key](https://console.groq.com/) and/or an [OpenRouter API key](https://openrouter.ai/)
-
----
-
-### Backend
+## Backend Setup
 
 ```bash
 cd backend
 
-# 1. Create a virtual environment
 python -m venv .venv
-source .venv/bin/activate      # Windows: .venv\Scripts\activate
 
-# 2. Install dependencies
+source .venv/bin/activate
+# Windows
+# .venv\Scripts\activate
+
 pip install -r requirements.txt
-
-# 3. Configure environment
-cp .env.example .env
-# Edit .env and set GROQ_API_KEY (and optionally OPENROUTER_API_KEY)
-
-# 4. Start the server
-uvicorn main:app --reload --port 8000
 ```
 
-API docs available at: http://localhost:8000/docs
+Create a `.env` file:
+
+```env
+MONGODB_URI=mongodb://localhost:27017
+MONGODB_DB_NAME=clauseguard
+
+JWT_SECRET_KEY=your_secret_key
+
+GROQ_API_KEY=your_groq_api_key
+OPENROUTER_API_KEY=your_openrouter_key
+
+ADMIN_EMAIL=admin@example.com
+ADMIN_PASSWORD=secure_password
+```
+
+Run the server:
+
+```bash
+uvicorn main:app --reload
+```
+
+Backend URL:
+
+```text
+http://localhost:8000
+```
+
+API Documentation:
+
+```text
+http://localhost:8000/docs
+```
 
 ---
 
-### Frontend
+## Frontend Setup
 
 ```bash
 cd frontend
 
-# 1. Install dependencies
 npm install
 
-# 2. Start the dev server
 npm run dev
 ```
 
-Open: http://localhost:5173
+Frontend URL:
 
-The Vite proxy forwards `/api/*` → `http://localhost:8000` automatically.
-
----
-
-### Environment variables
-
-| Variable | Required | Default | Description |
-|---|---|---|---|
-| `GROQ_API_KEY` | Yes* | — | Groq API key (primary provider) |
-| `OPENROUTER_API_KEY` | Yes* | — | OpenRouter key (fallback) |
-| `GROQ_MODEL` | No | `llama-3.3-70b-versatile` | Groq model ID |
-| `OPENROUTER_MODEL` | No | `deepseek/deepseek-chat` | OpenRouter model ID |
-| `MAX_CHUNK_SIZE` | No | `500` | Words per retrieval chunk |
-| `CHUNK_OVERLAP` | No | `50` | Overlapping words between chunks |
-| `MAX_CHUNKS_FOR_RETRIEVAL` | No | `5` | Top-k chunks injected into chat |
-
-*At least one of `GROQ_API_KEY` or `OPENROUTER_API_KEY` must be set.
+```text
+http://localhost:5173
+```
 
 ---
 
-## API Reference
+# API Endpoints
 
-| Method | Path | Description |
-|---|---|---|
-| `POST` | `/api/documents/upload` | Upload a PDF |
-| `POST` | `/api/documents/{id}/analyze` | Trigger LLM analysis |
-| `GET` | `/api/documents/{id}` | Get metadata + cached analysis |
-| `POST` | `/api/chat` | Send a grounded chat message |
-| `GET` | `/health` | Health check |
+## Authentication
+
+| Method | Endpoint         | Description      |
+| ------ | ---------------- | ---------------- |
+| POST   | /api/auth/signup | Register account |
+| POST   | /api/auth/login  | Login            |
+| GET    | /api/auth/me     | Current user     |
+
+## Documents
+
+| Method | Endpoint                    |
+| ------ | --------------------------- |
+| POST   | /api/documents/upload       |
+| GET    | /api/documents              |
+| GET    | /api/documents/{id}         |
+| DELETE | /api/documents/{id}         |
+| POST   | /api/documents/{id}/analyze |
+
+## Chat
+
+| Method | Endpoint                |
+| ------ | ----------------------- |
+| GET    | /api/chat               |
+| GET    | /api/chat/{document_id} |
+| POST   | /api/chat               |
+
+## Administration
+
+| Method | Endpoint                  |
+| ------ | ------------------------- |
+| GET    | /api/admin/users          |
+| GET    | /api/admin/documents      |
+| DELETE | /api/admin/documents/{id} |
 
 ---
 
-## Limitations
+# Security Features
 
-- Scanned / image-only PDFs are not supported (no OCR).
-- The in-memory store resets on server restart.
-- Analysis is capped at 8 000 words; longer documents are truncated at the beginning.
-- Not a substitute for qualified legal advice.
+* JWT-based authentication
+* Password hashing with bcrypt
+* User-specific document isolation
+* Protected API routes
+* Environment-based secret management
+* Secure MongoDB integration
+
+---
+
+# Testing
+
+Run backend tests:
+
+```bash
+cd backend
+
+pytest
+```
+
+Tests cover:
+
+* Authentication workflows
+* API endpoints
+* Authorization logic
+* Document processing functionality
+
+---
+
+# Future Enhancements
+
+* OCR support for scanned contracts
+* Multi-language legal analysis
+* Contract comparison engine
+* Clause recommendation system
+* Exportable compliance reports
+* Team collaboration workspaces
+* E-signature integrations
+* Advanced legal knowledge graph
+
+---
+
+# Use Cases
+
+### Legal Professionals
+
+Accelerate contract reviews and identify risks faster.
+
+### Startups
+
+Review vendor agreements, NDAs, and investment documents.
+
+### Compliance Teams
+
+Detect contractual obligations and compliance issues.
+
+### Business Owners
+
+Understand legal commitments without extensive legal expertise.
+
+---
+
+# License
+
+This project is licensed under the MIT License.
+
+---
+
+# Author
+
+**ClauseGuard AI**
+
+An intelligent legal document analysis platform built using modern AI technologies, FastAPI, React, and MongoDB.
